@@ -1,0 +1,226 @@
+---
+title: "Data Wrangling Workshop"
+author: "Reed Schoenfeld"
+date: "22 August 2025"
+output: html_document
+---
+
+# Intro
+
+## Importance of Data Wrangling
+
+When it comes to data science projects, data cleaning and wrangling is arguably the most important phase of the project. While most of the exciting analysis is usually done through exploratory data analysis, creating visualizations, or modeling, none of that would be possible without first preparing your data for analysis. Sports data specifically is often ridiculously messy upon initially gathering the data. Today, we will use relatively clean player data from Basketball Reference to emphasize some key data wrangling functions, but typically sports data will be messier than this when analyzing play-by-play data for example. Let's start by loading in our data and loading in the `tidyverse` package, a comprehensive R package focusing on working with tidy data. The `tidyverse` package contains the `dplyr` package, which specifically contains functions and framework for data wrangling in an efficient and intuitive manner
+
+```{r set-options}
+knitr::opts_chunk$set(message = F, warning = F)
+```
+
+```{r load-pck}
+library(tidyverse)
+library(janitor)
+```
+
+Here we load the data using the `read_csv()` function, which comes with `tidyverse`. For this workshop we will look at player data, both standard and advanced statistics which come separately on Basketball Reference
+
+```{r load-data}
+players23 <- read_csv("nbatotals23.csv")
+advanced23 <- read_csv("nbaadvanced23.csv")
+```
+
+## Pipe Operator
+
+Another handy thing about `tidyverse` is the `macgrittr` pipe. The pipe operator, which is central to the `tidyverse`, takes the preluding object passed through the pipe and passes it into the object on the right hand side of the pipe. For example, these two lines of code do the same thing:
+
+```{r}
+head(players23, 5)
+
+players23 |> 
+  head(5)
+```
+
+# Data Wrangling
+
+## Overview of Crucial dplyr Functions
+
+-   `select()`
+-   `filter()`
+-   `mutate()`
+-   `group_by()`
+-   `summarise()`
+-   `arrange()`
+-   `rename()`
+-   `drop_na()`
+
+## Select
+
+The `select()` function can be applied to a dataframe, selecting the columns of a dataframe to displays. Lets say we have a large dataframe with many columns/variables but only want to analyze a subset of these columns or only display certain columns in a table. Let's select only the players' names, team, and games played.
+
+```{r}
+players23 |> 
+  select(Player, Tm, G)
+```
+
+Notice how we have multiple rows for Precious Achiuwa, an observation for his statistics with the Raptors, one for his statistics with the Knicks, and another for his combined statistics. We will address this later when we get more comfortable with more functions.
+
+## Filter
+
+The `filter()` function is used to filter the dataframe for observations, given a certain condition. Let's suppose we're working on a project about veteran production. For this, we might want to only analyze players over the age of 32, for example. Let's filter the dataset to include only players who are over 32 years old.
+
+```{r}
+players23 |> 
+  filter(Age > 32)
+```
+
+## Mutate
+
+The `mutate()` function creates new variables, based on a function of existing variables in the dataset. This is very handy when we get raw data, like totals for sports data and want to compute per game averages for example. Let's mutate points per game to our dataframe.
+
+```{r}
+players23 |> 
+  mutate(ppg = PTS / G) |>
+  select(Player, Tm, G, ppg) |>
+  head(5)
+```
+
+Great, we have our PPG for each player, but now let's save this to our dataframe for future use, which is not automatically done.
+
+```{r}
+players23 <- players23 |> 
+  mutate(ppg = PTS / G)
+```
+
+## Group By and Summarise
+
+`group_by()` and `summarise()` (or `summarize()`) can be used together to calculate summary statistics across groups. This can be really powerful, and be done very efficiently in using R. Understanding and using these functions might be less intuitive than the others, but once mastered can prove to be very helpful. Let's say we want to get the FT% for every team this season.
+
+```{r}
+team_ft_pct <- players23 |> 
+  group_by(Tm) |>
+  summarize(team_ft_pct = sum(FT) / sum(FTA))
+team_ft_pct
+```
+
+## Arrange
+
+We see our above result of all 30 NBA teams, but it is difficult to tell who the best FT shooting teams are. Let's use the `arrange()` function to sort the `team_ft_pct` column. We can use this function to arrange the table in ascending or descending order by 1 or more columns. Here, we only arrange on 1 column,
+
+```{r}
+team_ft_pct |> 
+  arrange(desc(team_ft_pct)) |>
+  head(5)
+```
+
+Here we can see the Oklahoma City Thunder are the best FT shooting team this season.
+
+## Interlude
+
+Now, I bet we're all tired of seeing Precious Achiuwa 3 times at the top of every resulting dataframe we have been getting thus far. In a situation where we are not concerned about the team of the player, that is we only want 1 observation per player, we can use `dplyr` functions to filter out the other subsetted player statistics. In the case for players who have played for multiple teams this season, we only want the observation representing their total across all teams they have played for this season.
+
+We can use the help of `group_by()` to sort the players by games played, then filter for only the observation with the most games played for each player. This will correspond to the TOT observation. The cool thing about `group_by()` is that you can perform other `dplyr` functions within each group before ungrouping and returning to our original, ungrouped dataframe.
+
+```{r}
+players23 <- players23 |>
+  group_by(`Player-additional`) |>
+  filter(G == max(G)) |>
+  ungroup() |> 
+  arrange(`Player-additional`)
+players23 |>
+  head(5)
+```
+
+## Rename
+
+As the name suggests, `rename()` can be used to rename the name of a column. The new name goes on the left of the equals sign, the corresponding variable goes on the right side of the variable. The variable name `Player-additional` is pretty long, lets shorten this to `id`, referring to playerid.
+
+```{r}
+players23 <- players23 |>
+  rename(id = 'Player-additional')
+players23 |> 
+  select(Player, id) |>
+  head(5)
+```
+
+## Drop NA
+
+While it sometimes might be malpractice to simply drop the observations with NA values, we can use the `drop_na()` function to remove these observations for calculations that depend on there not being any NA values in the columns. Let's analyze a case where this is necessary with FT%.
+
+```{r}
+players23 |>
+  summarize(mean_ft_pct = mean(`FT%`))
+```
+
+Our result of the mean FT% is NA, which isn't the result we want. This happens because there are players who have not attempted a free throw all season, so their FT% is NA. Let's drop these players from the dataset just for the sake of this calculation.
+
+```{r}
+players23 |>
+  drop_na(`FT%`) |> 
+  summarize(mean_ft_pct = mean(`FT%`))
+```
+
+## Merging
+
+Almost always with sports analytics projects, you will be using two or more raw datasets and potentially trying to merge them into 1. For example, maybe we have a table with player stats and then another table with team stats. If we want to make some sort of analysis combining each individual player's stats with their team metrics, we would want to combine these tables based on the player's team. Here, we have two tables, one with player total stats and one with player advanced stats. Let's merge these tables together based on playerid.
+
+```{r}
+advanced23 <- advanced23 |>
+  group_by(`Player-additional`) |>
+  arrange(desc(G)) |>
+  filter(G == max(G)) |>
+  ungroup() |> 
+  arrange(`Player-additional`) |>
+  rename(id = `Player-additional`)
+```
+
+```{r}
+full_stats <- full_join(players23, advanced23, by = "id") |>
+  select(-ends_with(".y"))
+full_stats |>
+  head(20)
+```
+
+Now, we have a solid understanding of some of the most important functions in dplyr. Like all tools in R, comfort with `dplyr` functions are gained over time with practice and implementation. Let's try to answer some research questions using these functions.
+
+# Questions
+
+Let's answer these questions together using our dplyr functions.
+
+-   Which player is leading the NBA in win shares, `WS`, this season?
+
+```{r}
+full_stats |> arrange(desc(WS)) |>
+  head(1) |>
+  select(Player.x, WS)
+```
+
+-   Which player has the best assist to turnover ratio, having played at least 1000 minutes?
+
+```{r}
+full_stats |>
+  filter(MP.x >= 1000) |>
+  mutate(ast_to = AST / TOV) |>
+  arrange(desc(ast_to)) |>
+  select(Player.x, ast_to) |>
+  head(1)
+```
+
+-   Does mean usage percentage, `USG%`, vary on average between positions?
+
+```{r}
+full_stats |>
+  group_by(Pos.x) |>
+  drop_na(`USG%`) |>
+  summarize(mean_usg = mean(`USG%`)) |> 
+  arrange(desc(mean_usg))
+```
+
+-   Which teams are the best at getting to the FT line? (Note that we cannot merely combine the players FT attempt rate)
+
+```{r}
+full_stats |>
+  group_by(Tm.x) |>
+  summarize(ft_ar = sum(FTA) / sum(FGA)) |>
+  arrange(desc(ft_ar)) |>
+  head(5)
+```
+
+Hope this workshop helped with your introduction to data wrangling with `dplyr` functions. Refer to the `dplyr` cheatsheet in the repo, official documentation for `dplyr`, or online tutorials/other resources for more help. Additionally, feel free to reach out to me at `res86@duke.edu` for any specific questions, data wrangling related or otherwise!
