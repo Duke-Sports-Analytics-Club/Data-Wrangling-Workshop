@@ -23,8 +23,9 @@ library(janitor)
 Here we load the data using the `read_csv()` function, which comes with `tidyverse`. For this workshop we will look at player data, both standard and advanced statistics which come separately on Basketball Reference
 
 ```{r load-data}
-players23 <- read_csv("nbatotals23.csv")
-advanced23 <- read_csv("nbaadvanced23.csv")
+players23 <- read_csv("https://raw.githubusercontent.com/Duke-Sports-Analytics-Club/Data-Wrangling2024/main/data/nbatotals23.csv")
+
+advanced23 <- read_csv("https://raw.githubusercontent.com/Duke-Sports-Analytics-Club/Data-Wrangling2024/main/data/nbaadvanced23.csv")
 ```
 
 ## Pipe Operator
